@@ -1,4 +1,4 @@
-package __HuynhThanhTrinh;
+package com.huynhthanhtrinh.seafood_store;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
