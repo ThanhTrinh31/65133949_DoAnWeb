@@ -54,6 +54,9 @@ public class HaiSanController {
     @PostMapping
     public ResponseEntity<HaiSan> themHaiSan(@RequestBody HaiSan haisanMoi) {
         try {
+        	// THÊM DÒNG NÀY: Ép ID về null để MongoDB tự động tạo ID ngẫu nhiên mới
+        	haisanMoi.setId(null);
+        	
             HaiSan hs = repository.save(haisanMoi);
             // Sửa đổi trả về kiểu tường minh thông qua body
             return ResponseEntity.status(HttpStatus.CREATED).body(hs);
