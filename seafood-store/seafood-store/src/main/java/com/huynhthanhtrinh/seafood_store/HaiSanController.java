@@ -65,27 +65,16 @@ public class HaiSanController {
         }
     }
 
-    // 3. HÀM SỬA (CẬP NHẬT)
-    @PutMapping("/{id}")
-    public ResponseEntity<HaiSan> capNhatHaiSan(@PathVariable String id, @RequestBody HaiSan thongTinMoi) {
-        try {
-            thongTinMoi.setId(id);
-            HaiSan hsUpdated = repository.save(thongTinMoi);
-            return ResponseEntity.ok(hsUpdated);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+ // 3. HÀM SỬA (CẬP NHẬT)
+    @PutMapping("/api/haisan/{id}")
+    public HaiSan capNhatHaiSan(@PathVariable String id, @RequestBody HaiSan thongTinMoi) {
+        thongTinMoi.setId(id); // Ép cái ID cũ vào thông tin mới để nó đè lên đúng chỗ
+        return repository.save(thongTinMoi); 
     }
 
     // 4. HÀM XÓA
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> xoaHaiSan(@PathVariable String id) {
-        try {
-            repository.deleteById(id);
-            // Trả về 204 No Content chuẩn chỉ bằng Builder
-            return ResponseEntity.noContent().build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+    @DeleteMapping("/api/haisan/{id}")
+    public void xoaHaiSan(@PathVariable String id) {
+        repository.deleteById(id);
     }
 }
