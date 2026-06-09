@@ -14,14 +14,20 @@ function App() {
   const layDuLieu = () => {
     fetch('http://localhost:8080/api/haisan')
       .then(response => response.json())
-      .then(data => setDanhSachHaiSan(data))
-      .catch(error => console.error('Lỗi rồi:', error));
+      .then(data => {
+        // KIỂM TRA: Nếu đúng là mảng [] thì mới nhận, không thì gắn mảng rỗng để chống sập
+        if (Array.isArray(data)) {
+          setDanhSachHaiSan(data);
+        } else {
+          console.error("Backend trả về lỗi hoặc sai cấu trúc mảng rồi ông ơi:", data);
+          setDanhSachHaiSan([]); // Gắn mảng rỗng để giao diện không bị trắng tinh
+        }
+      })
+      .catch(error => {
+        console.error('Lỗi kết nối rồi:', error);
+        setDanhSachHaiSan([]);
+      });
   };
-
-  useEffect(() => {
-    layDuLieu();
-  }, []);
-
   // Hàm xử lý chung cho cả THÊM và SỬA
   const luuDuLieu = (e) => {
     e.preventDefault();
