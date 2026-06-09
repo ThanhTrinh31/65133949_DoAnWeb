@@ -1,28 +1,45 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
-// Khai báo danh sách các Danh Mục giống trang mẫu Đảo Hải Sản
 const DANH_MUC_LIST = [
   { ma: 'TAT_CA', ten: '✨ Tất Cả' },
   { ma: 'Tom', ten: '🦐 Tôm Các Loại' },
-  { ma: 'Cua', ten: '🦀 Cua - Ghẹ' },
-  { ma: 'Muc', ten: '🦑 Mực Tươi' },
-  { ma: 'Ca', ten: '🐟 Cá Hồi & Cá Tươi' },
+  { ma: 'CuaGhe', ten: '🦀 Cua - Ghẹ' },
+  { ma: 'Muc', ten: '🦑 Mực tươi' },
+  { ma: 'CaHoi', ten: '🐟 Cá Hồi' },
+  { ma: 'NgaoSooOc', ten: '🐚 Ngao - Sò - Ốc' },
+  { ma: 'HauSua', ten: '🦪 Hàu sữa' },
+  { ma: 'GiaViSot', ten: '🌶️ Gia Vị - Sốt' },
 ];
 
 function App() {
   const [danhSachHaiSan, setDanhSachHaiSan] = useState([]);
-  const [danhMucChon, setDanhMucChon] = useState('TAT_CA'); // Lưu danh mục đang lọc
-  const [gioHang, setGioHang] = useState([]); // Trạng thái giỏ hàng
+  const [danhMucChon, setDanhMucChon] = useState('TAT_CA');
+  const [gioHang, setGioHang] = useState([]);
 
-  // Các trạng thái phục vụ Form Admin
+  // Form Admin State
   const [ten, setTen] = useState('');
   const [giaBan, setGiaBan] = useState('');
   const [soLuong, setSoLuong] = useState('');
   const [hinhAnh, setHinhAnh] = useState('');
   const [danhMuc, setDanhMuc] = useState('Tom');
   const [idDangSua, setIdDangSua] = useState(null);
+  const formAdminRef = useRef(null);
 
-  // 1. LẤY DỮ LIỆU TỪ BACKEND
+  // State cho Đặt Hàng
+  const [hienFormDatHang, setHienFormDatHang] = useState(false);
+  const [tenKhach, setTenKhach] = useState('');
+  const [sdt, setSdt] = useState('');
+  const [email, setEmail] = useState('');
+  const [huyenChon, setHuyenChon] = useState('NhaTrang');
+  const [diaChiChiTiet, setDiaChiChiTiet] = useState('');
+  const [ghiChu, setGhiChu] = useState('');
+  const [phuongThucTT, setPhuongThucTT] = useState('COD');
+  const [ngayGiao, setNgayGiao] = useState('');
+  const [khungGioGiao, setKhungGioGiao] = useState('ANY');
+  const [gioGiaoCuThe, setGioGiaoCuThe] = useState('08:00');
+
+  const isAdminMode = new URLSearchParams(window.location.search).get('admin') === 'true';
+
   const layDuLieu = () => {
     fetch('http://localhost:8080/api/haisan')
       .then(response => response.json())
@@ -40,9 +57,10 @@ function App() {
 
   useEffect(() => {
     layDuLieu();
+    const today = new Date().toISOString().split('T')[0];
+    setNgayGiao(today);
   }, []);
 
-  // 2. LOGIC GIỎ HÀNG (MUA HÀNG)
   const themVaoGio = (haisan) => {
     const itemDaCo = gioHang.find(item => item.id === haisan.id);
     if (itemDaCo) {
@@ -56,110 +74,190 @@ function App() {
     setGioHang(gioHang.filter(item => item.id !== id));
   };
 
-  const tongTienGioHang = gioHang.reduce((tong, item) => tong + (item.giaBan * item.soLuongMua), 0);
+  const tongTienHang = gioHang.reduce((tong, item) => tong + (item.giaBan * item.soLuongMua), 0);
 
-  // 3. LOGIC ADMIN (THÊM, SỬA, XÓA KHO)
+  const tinhShipVaThoiGian = () => {
+    let phiShip = 0;
+    let thoiGian = 'Tối đa 1 tiếng';
+
+    if (huyenChon === 'NhaTrang') {
+      phiShip = tongTienHang > 1000000 ? 0 : 30000;
+      thoiGian = 'Tối đa 1 tiếng (Giao hỏa tốc nội thành)';
+    } else if (['CamRanh', 'DienKhanh', 'NinhHoa'].includes(huyenChon)) {
+      phiShip = 100000;
+      thoiGian = 'Tối đa 4 tiếng';
+    } else {
+      phiShip = 200000;
+      thoiGian = 'Tối đa 4 tiếng';
+    }
+    return { phiShip, thoiGian };
+  };
+
+  const { phiShip, thoiGianGiaoKhaiBao } = tinhShipVaThoiGian();
+  const tongThanhToanCuoiCung = tongTienHang + phiShip;
+
+  const dinhDangNgayVN = (ngayGoc) => {
+    if (!ngayGoc) return '';
+    const [year, month, day] = ngayGoc.split('-');
+    return `${day}/${month}/${year}`;
+  };
+
+  const handleXacNhanDatHang = (e) => {
+    e.preventDefault();
+    alert(`🎉 ĐẶT HÀNG THÀNH CÔNG!\n\nChào ông/bà ${tenKhach},\nĐơn hàng trị giá ${tongThanhToanCuoiCung.toLocaleString('vi-VN')} đ đã được Đại Hải Sản ghi nhận.\n⏱️ Thời gian nhận: Khung giờ ${khungGioGiao === 'ANY' ? 'Bất kỳ' : gioGiaoCuThe} - Ngày ${dinhDangNgayVN(ngayGiao)}\n🚚 Dự kiến giao: ${thoiGianGiaoKhaiBao}.\nCảm ơn bạn đã ủng hộ cửa hàng!`);
+    setGioHang([]);
+    setHienFormDatHang(false);
+  };
+
   const luuDuLieu = (e) => {
     e.preventDefault();
     const haisanData = { ten, giaBan: Number(giaBan), soLuong: Number(soLuong), hinhAnh, danhMuc };
-
     if (idDangSua) {
       fetch(`http://localhost:8080/api/haisan/${idDangSua}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(haisanData)
-      }).then(() => { layDuLieu(); huySua(); });
+      }).then(() => { alert("Cập nhật thành công!"); window.location.href = window.location.pathname + '?admin=true'; });
     } else {
       fetch('http://localhost:8080/api/haisan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(haisanData)
-      }).then(() => { layDuLieu(); huySua(); });
+      }).then(() => { alert("Thêm vào kho thành công!"); window.location.href = window.location.pathname + '?admin=true'; });
     }
   };
 
   const xoaHaiSan = (id) => {
-    if (window.confirm("Xóa món này khỏi kho nha ông?")) {
-      fetch(`http://localhost:8080/api/haisan/${id}`, { method: 'DELETE' }).then(() => layDuLieu());
+    if (window.confirm("Xóa món này khỏi kho?")) {
+      fetch(`http://localhost:8080/api/haisan/${id}`, { method: 'DELETE' }).then(() => { window.location.href = window.location.pathname + '?admin=true'; });
     }
   };
 
   const batDauSua = (haisan) => {
     setIdDangSua(haisan.id); setTen(haisan.ten); setGiaBan(haisan.giaBan);
     setSoLuong(haisan.soLuong); setHinhAnh(haisan.hinhAnh || ''); setDanhMuc(haisan.danhMuc || 'Tom');
+    setTimeout(() => { if (formAdminRef.current) formAdminRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
   };
 
-  const huySua = () => {
-    setIdDangSua(null); setTen(''); setGiaBan(''); setSoLuong(''); setHinhAnh(''); setDanhMuc('Tom');
+  const huySua = () => { setIdDangSua(null); setTen(''); setGiaBan(''); setSoLuong(''); setHinhAnh(''); setDanhMuc('Tom'); };
+
+  const hienThiTenDanhMuc = (maDm) => {
+    const dm = DANH_MUC_LIST.find(d => d.ma === maDm);
+    return dm ? dm.ten.replace(/✨|🦐|🦀|🦑|🐟|🐚|🦪|🌶️/g, '').trim() : maDm;
   };
 
-  // Lọc danh sách hải sản hiển thị theo Tab được chọn
-  const haiSanHienThi = danhMucChon === 'TAT_CA' 
-    ? danhSachHaiSan 
-    : danhSachHaiSan.filter(h => h.danhMuc === danhMucChon);
+  const haiSanHienThi = danhMucChon === 'TAT_CA' ? danhSachHaiSan : danhSachHaiSan.filter(h => h.danhMuc === danhMucChon);
 
   return (
-    <div style={{ fontFamily: 'Arial, sans-serif', backgroundColor: '#f9f9f9', minHeight: '100vh', paddingBottom: '50px' }}>
+    <div style={{ fontFamily: 'Arial, sans-serif', backgroundColor: '#f9f9f9', minHeight: '100vh', paddingBottom: '10px' }}>
       
-      {/* 🌟 HEADER CHUYÊN NGHIỆP GIỐNG ĐẢO HẢI SẢN */}
-      <header style={{ backgroundColor: '#007bff', color: 'white', padding: '15px 50px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
-        <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>🌊 ĐẢO HẢI SẢN - ĐỒ ÁN MẪU</h1>
+      {/* 🛠️ BỘ ĐỊNH TUYẾN CSS KHÓA TỶ LỆ VÀNG CHỐNG BỂ GIAO DIỆN & STICKY SIDEBAR */}
+      <style>{`
+        .main-container { display: flex; padding: 25px 40px; gap: 20px; align-items: flex-start; }
+        
+        .sidebar-left { 
+          width: 18%; 
+          background-color: white; 
+          padding: 20px; 
+          border-radius: 8px; 
+          box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
+          position: -webkit-sticky;
+          position: sticky; 
+          top: 20px;
+        }
+        
+        .product-grid-container { width: 57%; flex-grow: 1; }
+        .product-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        
+        .cart-right { 
+          width: 25%; 
+          background-color: white; 
+          padding: 20px; 
+          border-radius: 8px; 
+          box-shadow: 0 2px 5px rgba(0,0,0,0.05); 
+          position: -webkit-sticky;
+          position: sticky; 
+          top: 20px;
+        }
+        
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; overflow-y: auto; padding: 20px 0; }
+        .modal-content { background-color: white; padding: 30px; border-radius: 12px; width: 70%; max-width: 900px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); text-align: left; max-height: 90vh; overflow-y: auto; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; }
+        .qr-placeholder { border: 2px dashed #007bff; background-color: #f8f9fa; padding: 15px; text-align: center; border-radius: 6px; margin-top: 15px; }
+
+        @media (max-width: 1400px) { .product-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 1050px) {
+          .main-container { display: flex; flex-direction: column; padding: 15px; gap: 15px; }
+          .sidebar-left { width: 100%; position: static; }
+          .sidebar-left ul { display: flex; flex-wrap: wrap; gap: 8px; }
+          .sidebar-left ul li { margin: 0 !important; padding: 8px 12px !important; }
+          .product-grid-container { width: 100%; }
+          .product-grid { grid-template-columns: repeat(2, 1fr); }
+          .cart-right { width: 100%; position: static; }
+        }
+      `}</style>
+
+      {/* 🌟 HEADER THƯƠNG HIỆU ĐẠI HẢI SẢN */}
+      <header style={{ backgroundColor: '#007bff', color: 'white', padding: '15px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: '0 2px 10px rgba(0,0,0,0.1)' }}>
+        <h1 style={{ margin: 0, fontSize: '24px', fontWeight: 'bold' }}>🌊 ĐẠI HẢI SẢN</h1>
         <div style={{ fontSize: '18px', fontWeight: 'bold', backgroundColor: '#ff9800', padding: '8px 15px', borderRadius: '20px' }}>
-          🛒 Giỏ Hàng: {gioHang.length} món ({tongTienGioHang.toLocaleString('vi-VN')} đ)
+          🛒 Giỏ Hàng: {gioHang.length} món ({tongTienHang.toLocaleString('vi-VN')} đ)
         </div>
       </header>
 
-      <div style={{ display: 'flex', padding: '30px 50px', gap: '30px' }}>
+      {/* 📦 KHU VỰC THÂN TRANG */}
+      <div className="main-container">
         
-        {/* 🧭 THANH MENU DANH MỤC BÊN TRÁI (SIDEBAR) */}
-        <aside style={{ width: '20%', backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', height: 'fit-content' }}>
-          <h3 style={{ borderBottom: '2px solid #007bff', paddingBottom: '10px', marginTop: 0 }}>DANH MỤC</h3>
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+        {/* DANH MỤC */}
+        <aside className="sidebar-left">
+          <h3 style={{ borderBottom: '2px solid #007bff', paddingBottom: '10px', marginTop: 0, fontSize: '15px', textAlign: 'left' }}>DANH MỤC SẢN PHẨM</h3>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, textAlign: 'left' }}>
             {DANH_MUC_LIST.map(dm => (
-              <li key={dm.ma} onClick={() => setDanhMucChon(dm.ma)} style={{ padding: '12px 15px', margin: '5px 0', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', transition: '0.2s', backgroundColor: danhMucChon === dm.ma ? '#007bff' : 'transparent', color: danhMucChon === dm.ma ? 'white' : '#333' }}>
+              <li key={dm.ma} onClick={() => setDanhMucChon(dm.ma)} style={{ padding: '10px 12px', margin: '5px 0', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px', backgroundColor: danhMucChon === dm.ma ? '#007bff' : 'transparent', color: danhMucChon === dm.ma ? 'white' : '#333' }}>
                 {dm.ten}
               </li>
             ))}
           </ul>
         </aside>
 
-        {/* 🏪 KHU VỰC HIỂN THỊ SẢN PHẨM DẠNG LƯỚI (CARD) CHO KHÁCH HÀNG */}
-        <main style={{ width: '55%' }}>
-          <h2 style={{ color: '#333', marginTop: 0 }}>🔥 Sản Phẩm Đang Bán</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '20px' }}>
+        {/* LƯỚI SẢN PHẨM */}
+        <main className="product-grid-container">
+          <h2 style={{ color: '#333', marginTop: 0, fontSize: '22px', textAlign: 'left' }}>🔥 Sản Phẩm Bán Chạy</h2>
+          <div className="product-grid">
             {haiSanHienThi.length > 0 ? (
               haiSanHienThi.map(haisan => (
-                <div key={haisan.id} style={{ backgroundColor: 'white', border: '1px solid #eee', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', transition: '0.3s' }}>
-                  <img src={haisan.hinhAnh || 'https://via.placeholder.com/200x150?text=No+Image'} alt={haisan.ten} style={{ width: '100%', height: '150px', objectFit: 'cover' }} />
-                  <div style={{ padding: '15px', flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div key={haisan.id} style={{ backgroundColor: 'white', border: '1px solid #eee', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <img src={haisan.hinhAnh || 'https://via.placeholder.com/200x150?text=No+Image'} alt={haisan.ten} style={{ width: '100%', height: '140px', objectFit: 'cover' }} />
+                  <div style={{ padding: '12px', flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <div>
-                      <h4 style={{ margin: '0 0 10px 0', fontSize: '16px', color: '#333' }}>{haisan.ten}</h4>
-                      <p style={{ color: 'red', fontWeight: 'bold', fontSize: '16px', margin: '0 0 5px 0' }}>{haisan.giaBan?.toLocaleString('vi-VN')} đ</p>
-                      <p style={{ color: '#777', fontSize: '12px', margin: '0 0 15px 0' }}>Kho còn: {haisan.soLuong} phần</p>
+                      <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#333', height: '38px', overflow: 'hidden', textAlign: 'left' }}>{haisan.ten}</h4>
+                      <p style={{ color: 'red', fontWeight: 'bold', fontSize: '14px', margin: '0 0 4px 0', textAlign: 'left' }}>{haisan.giaBan?.toLocaleString('vi-VN')} đ</p>
+                      <p style={{ color: '#777', fontSize: '11px', margin: '0 0 12px 0', textAlign: 'left' }}>Kho: {haisan.soLuong} phần</p>
                     </div>
-                    <button onClick={() => themVaoGio(haisan)} style={{ width: '100%', padding: '10px', backgroundColor: '#ff9800', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}>
+                    <button onClick={() => themVaoGio(haisan)} style={{ width: '100%', padding: '8px', backgroundColor: '#ff9800', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', fontSize: '13px' }}>
                       🛒 Chọn Mua
                     </button>
                   </div>
                 </div>
               ))
             ) : (
-              <p>Mục này chưa nhập hàng ông ơi...</p>
+              <p style={{ fontStyle: 'italic', color: '#888', textAlign: 'left' }}>Mục này chưa có hàng bán ông ơi...</p>
             )}
           </div>
         </main>
 
-        {/* 🧾 KHU VỰC CHI TIẾT GIỎ HÀNG BÊN PHẢI */}
-        <aside style={{ width: '25%', backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', height: 'fit-content' }}>
-          <h3 style={{ marginTop: 0, borderBottom: '2px solid #ff9800', paddingBottom: '10px' }}>Chi Tiết Đơn Hàng</h3>
+        {/* GIỎ HÀNG BÊN PHẢI */}
+        <aside className="cart-right">
+          <h3 style={{ marginTop: 0, borderBottom: '2px solid #ff9800', paddingBottom: '10px', textAlign: 'left' }}>Chi Tiết Đơn Hàng</h3>
           {gioHang.length === 0 ? (
-            <p style={{ color: '#aaa', fontStyle: 'italic' }}>Giỏ hàng trống trơn...</p>
+            <p style={{ color: '#aaa', fontStyle: 'italic', textAlign: 'left' }}>Giỏ hàng trống trơn...</p>
           ) : (
             <div>
               {gioHang.map(item => (
-                <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px dashed #eee' }}>
-                  <div style={{ textAlign: 'left' }}>
-                    <span style={{ fontWeight: 'bold', fontSize: '14px' }}>{item.ten}</span>
+                <div key={item.id} style={{ display: 'flex', gap: '10px', alignItems: 'center', padding: '10px 0', borderBottom: '1px dashed #eee' }}>
+                  <img src={item.hinhAnh} alt="" style={{ width: '40px', height: '40px', objectFit: 'cover', borderRadius: '4px' }} />
+                  <div style={{ textAlign: 'left', flexGrow: 1 }}>
+                    <span style={{ fontWeight: 'bold', fontSize: '13px' }}>{item.ten}</span>
                     <br />
                     <span style={{ fontSize: '12px', color: '#777' }}>{item.soLuongMua} x {item.giaBan.toLocaleString('vi-VN')}đ</span>
                   </div>
@@ -167,8 +265,8 @@ function App() {
                 </div>
               ))}
               <div style={{ marginTop: '20px', textAlign: 'right' }}>
-                <h4 style={{ margin: '0 0 15px 0' }}>Tổng: <span style={{ color: 'red', fontSize: '20px' }}>{tongTienGioHang.toLocaleString('vi-VN')} đ</span></h4>
-                <button onClick={() => { alert('Chốt Đơn Thành Công! Hệ thống đã ghi nhận.'); setGioHang([]); }} style={{ width: '100%', padding: '12px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', fontSize: '16px', cursor: 'pointer' }}>
+                <h4 style={{ margin: '0 0 15px 0' }}>Tạm tính: <span style={{ color: 'red', fontSize: '18px' }}>{tongTienHang.toLocaleString('vi-VN')} đ</span></h4>
+                <button onClick={() => setHienFormDatHang(true)} style={{ width: '100%', padding: '12px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', fontSize: '15px', cursor: 'pointer' }}>
                   ⚡ THANH TOÁN NGAY
                 </button>
               </div>
@@ -177,59 +275,178 @@ function App() {
         </aside>
       </div>
 
-      <hr style={{ margin: '40px 50px 20px 50px', border: '1px solid #ddd' }} />
+      {/* FORM MODAL ĐẶT HÀNG CAO CẤP */}
+      {hienFormDatHang && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #007bff', paddingBottom: '10px', marginBottom: '20px' }}>
+              <h2 style={{ margin: 0, color: '#007bff' }}>📝 THÔNG TIN ĐẶT HÀNG & GIAO NHẬN</h2>
+              <button onClick={() => setHienFormDatHang(false)} style={{ padding: '5px 12px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Đóng X</button>
+            </div>
 
-      {/* 🛠️ BẢNG ĐIỀU KHIỂN ADMIN QUẢN LÝ KHO */}
-      <section style={{ padding: '0 50px' }}>
-        <h2 style={{ color: '#555' }}>🛠️ Hệ Thống Nhập Kho (Admin)</h2>
-        <form onSubmit={luuDuLieu} style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', display: 'inline-block', width: '100%', boxSizing: 'border-box', textAlign: 'left' }}>
-          <input type="text" placeholder="Tên hải sản" value={ten} onChange={(e) => setTen(e.target.value)} required style={{ margin: '5px', padding: '10px', width: '18%' }} />
-          <input type="number" placeholder="Giá bán" value={giaBan} onChange={(e) => setGiaBan(e.target.value)} required style={{ margin: '5px', padding: '10px', width: '12%' }} />
-          <input type="number" placeholder="Số lượng" value={soLuong} onChange={(e) => setSoLuong(e.target.value)} required style={{ margin: '5px', padding: '10px', width: '10%' }} />
-          <input type="text" placeholder="Link hình ảnh" value={hinhAnh} onChange={(e) => setHinhAnh(e.target.value)} style={{ margin: '5px', padding: '10px', width: '25%' }} />
-          
-          <select value={danhMuc} onChange={(e) => setDanhMuc(e.target.value)} style={{ margin: '5px', padding: '10px', width: '15%' }}>
-            <option value="Tom">静态 🦐 Tôm</option>
-            <option value="Cua">🦀 Cua</option>
-            <option value="Muc">🦑 Mực</option>
-            <option value="Ca">🐟 Cá</option>
-          </select>
+            <form onSubmit={handleXacNhanDatHang} className="form-grid">
+              {/* CỘT TRÁI */}
+              <div>
+                <h3 style={{ marginTop: 0, fontSize: '16px', color: '#555' }}>📍 1. Địa Chỉ Giao Hàng</h3>
+                
+                <label style={{ fontWeight: 'bold', display: 'block', margin: '10px 0 5px 0' }}>Họ và Tên Khách Hàng *</label>
+                <input type="text" value={tenKhach} onChange={(e) => setTenKhach(e.target.value)} required style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} placeholder="Nguyễn Văn A" />
 
-          <button type="submit" style={{ padding: '10px 20px', backgroundColor: idDangSua ? '#f39c12' : '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
-            {idDangSua ? '🔄 Cập Nhật' : '➕ Thêm Vào Kho'}
-          </button>
-          {idDangSua && <button type="button" onClick={huySua} style={{ padding: '10px 15px', marginLeft: '5px', backgroundColor: '#7f8c8d', color: 'white', border: 'none', borderRadius: '4px' }}>Hủy</button>}
-        </form>
+                <label style={{ fontWeight: 'bold', display: 'block', margin: '10px 0 5px 0' }}>Số Điện Thoại Nhận Hàng *</label>
+                <input type="tel" value={sdt} onChange={(e) => setSdt(e.target.value)} required style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} placeholder="0905xxxxxx" />
 
-        {/* BẢNG KHO HÀNG */}
-        <table border="1" cellPadding="10" style={{ margin: '20px 0 50px 0', borderCollapse: 'collapse', width: '100%', backgroundColor: 'white' }}>
-          <thead style={{ backgroundColor: '#343a40', color: 'white' }}>
-            <tr>
-              <th>Hình Ảnh</th>
-              <th>Tên</th>
-              <th>Danh Mục</th>
-              <th>Giá Cả</th>
-              <th>Kho Còn</th>
-              <th>Quản Lý</th>
-            </tr>
-          </thead>
-          <tbody>
-            {danhSachHaiSan.map((haisan) => (
-              <tr key={haisan.id}>
-                <td><img src={haisan.hinhAnh || 'https://via.placeholder.com/50'} alt="" style={{ width: '50px', height: '40px', objectFit: 'cover' }} /></td>
-                <td style={{ fontWeight: 'bold' }}>{haisan.ten}</td>
-                <td>{haisan.danhMuc}</td>
-                <td style={{ color: 'red' }}>{haisan.giaBan?.toLocaleString('vi-VN')} đ</td>
-                <td>{haisan.soLuong}</td>
-                <td>
-                  <button onClick={() => batDauSua(haisan)} style={{ marginRight: '5px', padding: '5px 10px', backgroundColor: '#ffc107', border: 'none', cursor: 'pointer' }}>✏️ Sửa</button>
-                  <button onClick={() => xoaHaiSan(haisan.id)} style={{ padding: '5px 10px', backgroundColor: '#dc3545', color: 'white', border: 'none', cursor: 'pointer' }}>🗑️ Xóa</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
+                <label style={{ fontWeight: 'bold', display: 'block', margin: '10px 0 5px 0' }}>Địa Chỉ Email</label>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} placeholder="khachhang@gmail.com" />
+
+                <label style={{ fontWeight: 'bold', display: 'block', margin: '10px 0 5px 0' }}>Quốc Gia</label>
+                <input type="text" value="Việt Nam" disabled style={{ width: '100%', padding: '8px', boxSizing: 'border-box', backgroundColor: '#eee' }} />
+
+                <label style={{ fontWeight: 'bold', display: 'block', margin: '10px 0 5px 0' }}>Tỉnh / Thành Phố</label>
+                <input type="text" value="Khánh Hòa (Chỉ hỗ trợ giao tại Khánh Hòa)" disabled style={{ width: '100%', padding: '8px', boxSizing: 'border-box', backgroundColor: '#eee', color: 'red', fontWeight: 'bold' }} />
+
+                <label style={{ fontWeight: 'bold', display: 'block', margin: '10px 0 5px 0' }}>Quận / Huyện (Chọn để tính phí ship) *</label>
+                <select value={huyenChon} onChange={(e) => setHuyenChon(e.target.value)} style={{ width: '100%', padding: '8px', fontWeight: 'bold' }}>
+                  <option value="NhaTrang">TP. Nha Trang (Nội thành)</option>
+                  <option value="CamRanh">TP. Cam Ranh</option>
+                  <option value="NinhHoa">Thị xã Ninh Hòa</option>
+                  <option value="DienKhanh">Huyện Diên Khánh</option>
+                  <option value="CamLam">Huyện Cam Lâm</option>
+                  <option value="VanNinh">Huyện Vạn Ninh</option>
+                  <option value="KhanhSon">Huyện Khánh Sơn</option>
+                  <option value="KhanhVinh">Huyện Khánh Vĩnh</option>
+                </select>
+
+                <label style={{ fontWeight: 'bold', display: 'block', margin: '10px 0 5px 0' }}>Địa chỉ chi tiết (Số nhà, Tên đường, Phường/Xã) *</label>
+                <input type="text" value={diaChiChiTiet} onChange={(e) => setDiaChiChiTiet(e.target.value)} required style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} placeholder="Ví dụ: 12 Ngô Gia Tự, Phường Phước Tiến" />
+
+                <label style={{ fontWeight: 'bold', display: 'block', margin: '10px 0 5px 0' }}>Ghi Chú Đơn Hàng</label>
+                <textarea value={ghiChu} onChange={(e) => setGhiChu(e.target.value)} style={{ width: '100%', padding: '8px', boxSizing: 'border-box', height: '60px' }} placeholder="Giao hàng nhẹ tay, gọi điện trước khi đến..." />
+              </div>
+
+              {/* CỘT PHẢI */}
+              <div>
+                <h3 style={{ marginTop: 0, fontSize: '16px', color: '#555' }}>⏱️ 2. Thời Gian Giao Nhận</h3>
+                
+                <label style={{ fontWeight: 'bold', display: 'block', margin: '10px 0 5px 0' }}>Chọn Ngày Giao</label>
+                <input 
+                  type="text" 
+                  value={ngayGiao ? ngayGiao.split('-').reverse().join('/') : ''} 
+                  placeholder="dd/mm/yyyy"
+                  onFocus={(e) => e.target.type = 'date'}
+                  onBlur={(e) => { if(!e.target.value) e.target.type = 'text'; }}
+                  onChange={(e) => setNgayGiao(e.target.value)}
+                  required 
+                  style={{ width: '100%', padding: '8px', boxSizing: 'border-box', fontWeight: 'bold' }} 
+                />
+
+                <label style={{ fontWeight: 'bold', display: 'block', margin: '10px 0 5px 0' }}>Khung Giờ Giao Hàng *</label>
+                <div style={{ display: 'flex', gap: '15px', margin: '5px 0' }}>
+                  <label><input type="radio" name="time_mode" checked={khungGioGiao === 'ANY'} onChange={() => setKhungGioGiao('ANY')} /> Giao bất kì khung giờ nào</label>
+                  <label><input type="radio" name="time_mode" checked={khungGioGiao === 'CUSTOM'} onChange={() => setKhungGioGiao('CUSTOM')} /> Chọn giờ cụ thể</label>
+                </div>
+                {khungGioGiao === 'CUSTOM' && (
+                  <input type="time" value={gioGiaoCuThe} onChange={(e) => setGioGiaoCuThe(e.target.value)} style={{ width: '50%', padding: '8px', marginTop: '5px' }} />
+                )}
+
+                <h3 style={{ marginTop: '25px', fontSize: '16px', color: '#555', borderTop: '1px solid #eee', paddingTop: '15px' }}>💳 3. Phương Thức Thanh Toán</h3>
+                <div style={{ display: 'flex', gap: '20px', margin: '10px 0' }}>
+                  <label style={{ fontWeight: 'bold', cursor: 'pointer' }}><input type="radio" name="payment_mode" checked={phuongThucTT === 'COD'} onChange={() => setPhuongThucTT('COD')} /> Thanh toán khi nhận hàng (COD)</label>
+                  <label style={{ fontWeight: 'bold', cursor: 'pointer' }}><input type="radio" name="payment_mode" checked={phuongThucTT === 'BANKING'} onChange={() => setPhuongThucTT('BANKING')} /> Chuyển khoản qua Ngân hàng</label>
+                </div>
+
+                {phuongThucTT === 'BANKING' && (
+                  <div className="qr-placeholder">
+                    <p style={{ margin: '0 0 10px 0', fontWeight: 'bold', color: '#007bff' }}>📸 QUÉT MÃ QR ĐỂ CHUYỂN KHOẢN THANH TOÁN</p>
+                    {/* ⚙️ THAY FILE ẢNH QR TRÊN MÁY: Quẹt ảnh vào mục public rồi sửa thành src="/ten_file_anh.png" nhé */}
+                    <img 
+                      src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=DaiHaiSanStore" 
+                      alt="Ma QR Thanh Toan" 
+                      style={{ width: '160px', height: '160px', border: '1px solid #ccc', padding: '5px', backgroundColor: 'white' }} 
+                    /> 
+                    <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#666' }}>Số tài khoản: 090905101205</p>
+                    <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#666' }}>MB Bank Huỳnh Thanh Trình</p>
+                    <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#666' }}>(Thông tin đơn hàng sẽ được gửi qua email của bạn một cách nhanh chóng.)</p>
+                  </div>
+                )}
+
+                {/* TỔNG HỢP CHI PHÍ */}
+                <div style={{ marginTop: '25px', backgroundColor: '#fff3cd', padding: '15px', borderRadius: '8px', border: '1px solid #ffeeba' }}>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '14px' }}>💵 Tiền hàng: <b>{tongTienHang.toLocaleString('vi-VN')} đ</b></p>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '14px' }}>🚚 Phí giao hàng: <b style={{ color: phiShip === 0 ? 'green' : 'black' }}>{phiShip === 0 ? 'Miễn phí (Freeship >1tr)' : `${phiShip.toLocaleString('vi-VN')} đ`}</b></p>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#856404' }}>⏱️ Thời gian xử lý: <b>{thoiGianGiaoKhaiBao}</b></p>
+                  <hr style={{ border: 'none', borderTop: '1px solid #ffeeba' }} />
+                  <h3 style={{ margin: '5px 0 0 0', color: 'red', fontSize: '18px' }}>Tổng thanh toán: {tongThanhToanCuoiCung.toLocaleString('vi-VN')} đ</h3>
+                </div>
+
+                <button type="submit" style={{ width: '100%', marginTop: '20px', padding: '12px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '6px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' }}>
+                  🚀 XÁC NHẬN ĐẶT HÀNG
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🌟 FOOTER THÔNG TIN LIÊN HỆ CỦA ÔNG */}
+      <footer style={{ backgroundColor: '#343a40', color: '#bbb', padding: '25px 40px', marginTop: '60px', textAlign: 'center', fontSize: '14px', borderTop: '3px solid #007bff' }}>
+        <p style={{ margin: '0 0 8px 0', color: 'white', fontWeight: 'bold', fontSize: '16px' }}>🌊 HỆ THỐNG CỬA HÀNG ĐẠI HẢI SẢN KHÁNH HÒA</p>
+        <p style={{ margin: '5px 0' }}>📞 Hotline Hỗ Trợ: <b style={{ color: '#ff9800' }}>0963670363</b> | ✉️ Email Đơn Hàng: <b style={{ color: '#007bff' }}>Daihaisan31@gmail.com</b></p>
+        <p style={{ margin: '5px 0', fontSize: '12px', color: '#777' }}>© Đồ Án Tốt Nghiệp / Bài Tập Lớn Phát Triển Hệ Thống E-Commerce Thực Chuyến 2026.</p>
+      </footer>
+
+      {/* ADMIN PANEL */}
+      {isAdminMode && (
+        <>
+          <hr style={{ margin: '40px 40px 20px 40px', border: '1px solid #ddd' }} />
+          <section style={{ padding: '0 40px' }}>
+            <h2 ref={formAdminRef} style={{ color: '#555', textAlign: 'left', scrollMarginTop: '30px' }}>🛠️ Hệ Thống Nhập Kho (Admin)</h2>
+            <form onSubmit={luuDuLieu} style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', display: 'block', width: '100%', boxSizing: 'border-box', textAlign: 'left' }}>
+              <input type="text" placeholder="Tên hải sản" value={ten} onChange={(e) => setTen(e.target.value)} required style={{ margin: '5px', padding: '10px', width: '22%', minWidth: '150px' }} />
+              <input type="number" placeholder="Giá bán" value={giaBan} onChange={(e) => setGiaBan(e.target.value)} required style={{ margin: '5px', padding: '10px', width: '12%', minWidth: '100px' }} />
+              <input type="number" placeholder="Số lượng" value={soLuong} onChange={(e) => setSoLuong(e.target.value)} required style={{ margin: '5px', padding: '10px', width: '10%', minWidth: '80px' }} />
+              <input type="text" placeholder="Link hình ảnh" value={hinhAnh} onChange={(e) => setHinhAnh(e.target.value)} style={{ margin: '5px', padding: '10px', width: '25%', minWidth: '180px' }} />
+              
+              <select value={danhMuc} onChange={(e) => setDanhMuc(e.target.value)} style={{ margin: '5px', padding: '10px', width: '15%', minWidth: '140px', fontWeight: 'bold' }}>
+                <option value="Tom">🦐 Tôm Các Loại</option>
+                <option value="CuaGhe">🦀 Cua - Ghẹ</option>
+                <option value="Muc">🦑 Mực tươi</option>
+                <option value="CaHoi">🐟 Cá Hồi</option>
+                <option value="NgaoSooOc">🐚 Ngao - Sò - Ốc</option>
+                <option value="HauSua">🦪 Hàu sữa</option>
+                <option value="GiaViSot">🌶️ Gia Vị - Sốt</option>
+              </select>
+
+              <button type="submit" style={{ padding: '10px 20px', margin: '5px', backgroundColor: idDangSua ? '#f39c12' : '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
+                {idDangSua ? '🔄 Cập Nhật' : '➕ Thêm Vào Kho'}
+              </button>
+              {idDangSua && <button type="button" onClick={huySua} style={{ padding: '10px 15px', marginLeft: '5px', backgroundColor: '#7f8c8d', color: 'white', border: 'none', borderRadius: '4px' }}>Hủy</button>}
+            </form>
+
+            <div style={{ overflowX: 'auto', width: '100%', marginTop: '20px' }}>
+              <table border="1" cellPadding="10" style={{ borderCollapse: 'collapse', width: '100%', backgroundColor: 'white', minWidth: '700px' }}>
+                <thead style={{ backgroundColor: '#343a40', color: 'white' }}>
+                  <tr><th>Hình Ảnh</th><th>Tên</th><th>Danh Mục</th><th>Giá Cả</th><th>Kho Còn</th><th>Quản Lý</th></tr>
+                </thead>
+                <tbody>
+                  {danhSachHaiSan.map((haisan) => (
+                    <tr key={haisan.id}>
+                      <td><img src={haisan.hinhAnh || 'https://via.placeholder.com/50'} alt="" style={{ width: '50px', height: '40px', objectFit: 'cover' }} /></td>
+                      <td style={{ fontWeight: 'bold', textAlign: 'left' }}>{haisan.ten}</td>
+                      <td style={{ color: '#007bff', fontWeight: 'bold', textAlign: 'left' }}>{hienThiTenDanhMuc(haisan.danhMuc)}</td>
+                      <td style={{ color: 'red', fontWeight: 'bold', textAlign: 'left' }}>{haisan.giaBan?.toLocaleString('vi-VN')} đ</td>
+                      <td>{haisan.soLuong}</td>
+                      <td>
+                        <button onClick={() => batDauSua(haisan)} style={{ marginRight: '5px', padding: '5px 10px', backgroundColor: '#ffc107', border: 'none', cursor: 'pointer' }}>✏️ Sửa</button>
+                        <button onClick={() => xoaHaiSan(haisan.id)} style={{ padding: '5px 10px', backgroundColor: '#dc3545', color: 'white', border: 'none', cursor: 'pointer' }}>🗑️ Xóa</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
+      )}
     </div>
   );
 }
