@@ -1,9 +1,12 @@
-package com.huynhthanhtrinh.seafood_store;
+package com.huynhthanhtrinh.seafood_store.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import com.huynhthanhtrinh.seafood_store.model.DonHang;
+import com.huynhthanhtrinh.seafood_store.repository.DonHangRepository;
 
 @RestController
 @RequestMapping("/api/donhang")
